@@ -1,0 +1,15 @@
+{
+  "name": "timeflow",
+  "version": "1.0.0",
+  "private": true,
+  "description": "TimeFlow - a dark, offline-first deadline countdown, stopwatch, and notes workspace for web and Android.",
+  "scripts": {
+    "dev": "npm --prefix Frontend run dev",
+    "build": "npm --prefix Frontend run build",
+    "preview": "npm --prefix Frontend run preview",
+    "lint": "npm --prefix Frontend run lint",
+    "apk": "./scripts/build-apk.sh"
+  },
+  "author": "Lavish Mehra",
+  "license": "MIT"
+}

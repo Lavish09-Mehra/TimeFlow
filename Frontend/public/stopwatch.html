@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stopwatch</title>
+<style>
+  :root {
+    --lit: #d6d9e0;
+    --glow: rgba(214, 217, 224, .34);
+    --unlit: #3a3c43;
+    --panel-a: #2c2e34;
+    --panel-b: #202227;
+    --text: #e6e8ee;
+    --muted: #8c909c;
+    --line: #2a2c33;
+    --dw: clamp(22px, 7.6vw, 62px);
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    min-height: 100vh; padding: 28px 16px 40px;
+    display: flex; flex-direction: column; align-items: center; gap: 24px;
+    background: transparent;
+    color: var(--text); font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+
+  /* Metal bezel */
+  .bezel {
+    position: relative; padding: 12px; border-radius: 24px; margin-top: 4vh;
+    background: linear-gradient(145deg, #f1f2f5 0%, #9396a0 22%, #3b3d44 48%, #8b8e98 74%, #e4e6eb 100%);
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, .7), inset 0 -2px 3px rgba(0, 0, 0, .5);
+  }
+  .bezel-inner { padding: 7px; border-radius: 17px; background: #121316; box-shadow: inset 0 3px 8px #000, 0 1px 0 rgba(255, 255, 255, .25); }
+  .screw {
+    position: absolute; width: 11px; height: 11px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #fafafa, #8a8d96 55%, #4b4d55); box-shadow: 0 1px 2px rgba(0, 0, 0, .7);
+  }
+  .screw::after { content: ""; position: absolute; inset: 4.5px -1px auto; height: 2px; background: #3a3c42; transform: rotate(35deg); }
+  .screw:nth-child(1) { top: 7px; left: 7px; }
+  .screw:nth-child(2) { top: 7px; right: 7px; }
+  .screw:nth-child(3) { bottom: 7px; left: 7px; }
+  .screw:nth-child(4) { bottom: 7px; right: 7px; }
+
+  /* Grey panel */
+  .panel {
+    position: relative; overflow: hidden; border-radius: 12px;
+    padding: clamp(14px, 2.4vw, 24px) clamp(16px, 3.6vw, 44px) clamp(22px, 3.6vw, 40px);
+    background: linear-gradient(180deg, var(--panel-a), var(--panel-b));
+    box-shadow: inset 0 0 28px rgba(0, 0, 0, .5), inset 0 2px 4px rgba(0, 0, 0, .5);
+  }
+  .panel::after { content: ""; position: absolute; inset: 0 0 55% 0; pointer-events: none; background: linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, 0)); }
+
+  .top { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: clamp(16px, 3vw, 30px); font-size: 13px; color: var(--muted); }
+  .state { display: flex; align-items: center; gap: 8px; }
+  .lamp { width: 8px; height: 8px; border-radius: 50%; background: #55585f; transition: background .2s, box-shadow .2s; }
+  .running .lamp { background: #a6e6bd; box-shadow: 0 0 8px rgba(166, 230, 189, .8); }
+
+  .digits { display: flex; align-items: flex-end; justify-content: center; gap: calc(var(--dw) * .14); }
+  svg.digit { width: var(--dw); height: auto; transform: skewX(-6deg); overflow: visible; }
+  svg.small { width: calc(var(--dw) * .55); }
+  .seg { fill: var(--unlit); }
+  .seg.on { fill: var(--lit); filter: drop-shadow(0 0 2px var(--glow)) drop-shadow(0 0 8px rgba(214, 217, 224, .16)); }
+
+  .colon { height: calc(var(--dw) * 1.667); display: flex; flex-direction: column; justify-content: center; gap: calc(var(--dw) * .38); }
+  .colon i, .dot { width: calc(var(--dw) * .16); height: calc(var(--dw) * .16); border-radius: 2px; background: var(--unlit); transition: background .12s; }
+  .colon.on i, .dot { background: var(--lit); box-shadow: 0 0 6px var(--glow); }
+  .dot { margin-bottom: calc(var(--dw) * .02); }
+
+  /* Buttons */
+  .btns { display: flex; gap: 12px; }
+  .btn {
+    font: inherit; font-weight: 600; padding: 13px 30px; border-radius: 11px; cursor: pointer;
+    transition: transform .15s, filter .15s; min-width: 120px;
+  }
+  .btn:active { transform: scale(.96); }
+  .btn:focus-visible { outline: 2px solid var(--lit); outline-offset: 3px; }
+  .primary { border: 0; color: #17181c; background: linear-gradient(#e6e8ee, #b7bbc6); box-shadow: 0 6px 18px rgba(0, 0, 0, .4), inset 0 1px 0 rgba(255, 255, 255, .7); }
+  .primary:hover { filter: brightness(1.06); }
+  .ghost { color: var(--text); background: #1a1b20; border: 1px solid #353740; }
+  .ghost:hover { background: #22242a; }
+
+  /* Log */
+  .log { width: min(100%, 560px); padding: 18px 20px; border-radius: 14px; background: #17181c; border: 1px solid var(--line); }
+  .log h2 { font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
+  .log h2:not(:first-child) { margin-top: 20px; }
+  .log ul { list-style: none; padding: 0; }
+  .log li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding: 7px 0; border-top: 1px solid var(--line); font-size: 14px; font-variant-numeric: tabular-nums; }
+  .log li:first-child { border-top: 0; }
+  .log .l { color: var(--text); }
+  .log .sess .l { flex: 1 1 auto; min-width: 0; }
+  .log .day .l { flex: 0 0 auto; min-width: 100px; }
+  .log .r { color: var(--lit); }
+  .log .empty { color: var(--muted); }
+  .ic { width: 30px; height: 30px; display: grid; place-items: center; border: 0; border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer; transition: background .15s, color .15s; }
+  .ic:hover { background: #24262c; color: var(--text); }
+  .ic.has { color: var(--lit); }
+  .ic:focus-visible { outline: 2px solid var(--lit); outline-offset: 1px; }
+  .sp { width: 30px; height: 30px; }
+  .note-line { flex-basis: 100%; margin: 0 0 4px; font-size: 13px; line-height: 1.4; color: #b4b8c3; overflow-wrap: anywhere; }
+  .note-in { width: 100%; font: inherit; font-size: 13px; padding: 8px 10px; border-radius: 8px; border: 1px solid #3a3c45; background: #101114; color: var(--text); }
+  .note-in:focus { outline: none; border-color: var(--lit); }
+  .more { margin-top: 8px; padding: 6px 0; border: 0; background: none; color: var(--muted); font: inherit; font-size: 13px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+  .more:hover { color: var(--text); }
+  .more[hidden] { display: none; }
+
+  .pop {
+    position: fixed; z-index: 20; left: 0; top: 0; width: min(310px, calc(100vw - 16px));
+    padding: 14px 16px; border-radius: 12px; background: #1d1e24; border: 1px solid #373942;
+    box-shadow: 0 18px 44px rgba(0, 0, 0, .6); font-size: 13px;
+    opacity: 0; visibility: hidden; transform: translateY(-4px); pointer-events: none;
+    transition: opacity .15s, transform .15s, visibility 0s .15s;
+  }
+  .pop.show { opacity: 1; visibility: visible; transform: none; pointer-events: auto; transition-delay: 0s; }
+  .pop h3 { font-size: 14px; font-weight: 600; }
+  .pop .sub { margin: 3px 0 10px; color: var(--muted); }
+  .plist { list-style: none; padding: 0; max-height: 240px; overflow: auto; }
+  .plist li { display: grid; grid-template-columns: 1.6em 1fr auto; gap: 2px 8px; padding: 6px 8px; margin: 0 -8px; border-radius: 8px; font-variant-numeric: tabular-nums; }
+  .plist li.cur { background: #272930; }
+  .plist .n { color: var(--muted); }
+  .plist .d { color: var(--lit); }
+  .plist .pn { grid-column: 2 / 4; color: var(--muted); overflow-wrap: anywhere; }
+  .bar { flex: 1; height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; }
+  .bar b { display: block; height: 100%; background: #9a9ea9; border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<div class="bezel">
+  <span class="screw"></span><span class="screw"></span><span class="screw"></span><span class="screw"></span>
+  <div class="bezel-inner">
+    <div class="panel" id="panel">
+      <div class="top"><span id="date"></span><span class="state"><span class="lamp"></span><span id="state">Ready</span></span></div>
+      <div class="digits" id="digits"></div>
+    </div>
+  </div>
+</div>
+
+<div class="btns">
+  <button class="btn primary" id="toggle">Start</button>
+  <button class="btn ghost" id="reset">Reset today</button>
+</div>
+
+<section class="log">
+  <h2>Sessions today</h2>
+  <ul id="sessions"></ul>
+  <h2>Earlier days</h2>
+  <ul id="history"></ul>
+  <button class="more" id="more" hidden>Read more</button>
+</section>
+<div class="pop" id="pop" role="dialog" aria-label="Session details"></div>
+
+<script>
+(() => {
+  const SEGS = {
+    a: "12,2 48,2 54,8 48,14 12,14 6,8",
+    b: "54,10 60,16 60,42 54,48 48,42 48,16",
+    c: "54,52 60,58 60,84 54,90 48,84 48,58",
+    d: "12,86 48,86 54,92 48,98 12,98 6,92",
+    e: "6,52 12,58 12,84 6,90 0,84 0,58",
+    f: "6,10 12,16 12,42 6,48 0,42 0,16",
+    g: "12,44 48,44 54,50 48,56 12,56 6,50"
+  };
+  const MAP = ["abcdef", "bc", "abdeg", "abcdg", "bcfg", "acdfg", "acdefg", "abc", "abcdefg", "abcdfg"];
+  const NS = "http://www.w3.org/2000/svg";
+  const $ = id => document.getElementById(id);
+  const pad = n => String(n).padStart(2, "0");
+
+  /* ---------- Digits ---------- */
+  function makeDigit(small) {
+    const svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("viewBox", "0 0 60 100");
+    svg.setAttribute("class", "digit" + (small ? " small" : ""));
+    svg.segs = {}; svg.v = -1;
+    for (const k in SEGS) {
+      const p = document.createElementNS(NS, "polygon");
+      p.setAttribute("points", SEGS[k]);
+      p.setAttribute("class", "seg");
+      svg.appendChild(p); svg.segs[k] = p;
+    }
+    return svg;
+  }
+  const setDigit = (svg, n) => {
+    if (svg.v === n) return;
+    svg.v = n;
+    for (const k in svg.segs) svg.segs[k].classList.toggle("on", MAP[n].includes(k));
+  };
+  const makeColon = () => { const c = document.createElement("div"); c.className = "colon"; c.innerHTML = "<i></i><i></i>"; return c; };
+
+  const D = [makeDigit(), makeDigit(), makeDigit(), makeDigit(), makeDigit(), makeDigit(), makeDigit(true), makeDigit(true)];
+  const colons = [makeColon(), makeColon()];
+  const dot = document.createElement("div"); dot.className = "dot";
+  $("digits").append(D[0], D[1], colons[0], D[2], D[3], colons[1], D[4], D[5], dot, D[6], D[7]);
+
+  /* ---------- State ---------- */
+  const KEY = "stopwatch-v1";
+  const dayKey = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const parseKey = k => { const [y, m, d] = k.split("-").map(Number); return new Date(y, m - 1, d); };
+  const fresh = () => ({ day: dayKey(new Date()), elapsed: 0, startedAt: null, sessions: [], history: {} });
+
+  let st;
+  try { st = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
+  if (!st || typeof st.day !== "string") st = fresh();
+  st.history = st.history || {};
+  Object.keys(st.history).forEach(k => { const v = st.history[k]; if (typeof v === "number") st.history[k] = { t: v, s: null }; });
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} };
+
+  // New day: close out yesterday, keep a running session going from midnight
+  function rollover(now) {
+    const key = dayKey(now);
+    if (key === st.day) return;
+    const dayEnd = new Date(parseKey(st.day).getFullYear(), parseKey(st.day).getMonth(), parseKey(st.day).getDate() + 1).getTime();
+    const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    let total = st.elapsed;
+    if (st.startedAt) { total += dayEnd - st.startedAt; st.sessions.push({ s: st.startedAt, e: dayEnd }); }
+    const history = st.history;
+    if (total > 0 || st.sessions.length) {
+      const prev = history[st.day] || { t: 0, s: [] };
+      history[st.day] = { t: prev.t + total, s: (prev.s || []).concat(st.sessions) };
+    }
+    Object.keys(history).sort().slice(0, -14).forEach(k => delete history[k]);
+    st = { day: key, elapsed: 0, startedAt: st.startedAt ? midnight : null, sessions: [], history };
+    save();
+  }
+  rollover(new Date());
+
+  // Archive the current day before "Reset today" clears the active timer.
+  // This keeps the session visible under "Earlier days" and in localStorage.
+  function archiveCurrentDay(now) {
+    let total = st.elapsed;
+    if (st.startedAt) {
+      total += now - st.startedAt;
+      st.sessions.push({ s: st.startedAt, e: now });
+      st.startedAt = null;
+    }
+    if (total > 0 || st.sessions.length) {
+      const prev = st.history[st.day] || { t: 0, s: [] };
+      st.history[st.day] = { t: prev.t + total, s: (prev.s || []).concat(st.sessions) };
+    }
+    Object.keys(st.history).sort().slice(0, -14).forEach(k => delete st.history[k]);
+  }
+
+  /* ---------- Lists ---------- */
+  const fmtTime = t => new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const fmtDur = ms => {
+    const s = Math.floor(ms / 1000), h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60);
+    return h ? `${h}h ${pad(m)}m` : m ? `${m}m ${pad(s % 60)}s` : `${s}s`;
+  };
+  const dayFmt = new Intl.DateTimeFormat("en", { weekday: "short", day: "numeric", month: "short" });
+
+  const ICON_NOTE = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
+  const ICON_INFO = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/></svg>';
+  const longDate = new Intl.DateTimeFormat("en", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+
+  const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text !== undefined) n.textContent = text; return n; };
+  const iconBtn = (svg, label, cls) => {
+    const b = el("button", "ic" + (cls ? " " + cls : ""));
+    b.type = "button"; b.innerHTML = svg; b.title = label; b.setAttribute("aria-label", label);
+    return b;
+  };
+  const empty = text => el("li", "empty", text);
+  const totalOf = list => list.reduce((a, x) => a + ((x.e || Date.now()) - x.s), 0);
+  const todayList = () => st.sessions.concat(st.startedAt ? [{ s: st.startedAt, e: null }] : []);
+
+  let editing = null, showAllDays = false, popBtn = null;
+  const pop = $("pop");
+
+  /* Info popover */
+  function closePop() { pop.classList.remove("show"); popBtn = null; }
+
+  function openPop(btn, date, list, hi, total) {
+    if (popBtn === btn) { closePop(); return; }
+    pop.replaceChildren();
+    pop.appendChild(el("h3", "", longDate.format(date)));
+    if (list) {
+      pop.appendChild(el("p", "sub", `${list.length} session${list.length === 1 ? "" : "s"}, ${fmtDur(totalOf(list))} total`));
+      const ol = el("ol", "plist");
+      list.forEach((x, i) => {
+        const li = el("li", i === hi ? "cur" : "");
+        li.append(el("span", "n", String(i + 1)), el("span", "t", `${fmtTime(x.s)} – ${x.e ? fmtTime(x.e) : "now"}`), el("span", "d", x.e ? fmtDur(x.e - x.s) : "Running"));
+        if (x.note) li.appendChild(el("span", "pn", x.note));
+        ol.appendChild(li);
+      });
+      pop.appendChild(ol);
+    } else {
+      pop.appendChild(el("p", "sub", `${fmtDur(total)} total. Session details weren’t saved for this day.`));
+    }
+    popBtn = btn;
+    pop.classList.add("show");
+    const r = btn.getBoundingClientRect(), w = pop.offsetWidth, h = pop.offsetHeight;
+    let top = r.bottom + 8;
+    if (top + h > innerHeight - 8) top = Math.max(8, r.top - h - 8);
+    pop.style.top = top + "px";
+    pop.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.right - w)) + "px";
+  }
+
+  /* Today's rows: time range, duration, note icon, info icon */
+  function sessionRow(i) {
+    const x = st.sessions[i];
+    const li = el("li", "sess");
+    li.append(el("span", "l", `${fmtTime(x.s)} – ${fmtTime(x.e)}`), el("span", "r", fmtDur(x.e - x.s)));
+
+    const nb = iconBtn(ICON_NOTE, x.note ? "Edit note" : "Add note", x.note ? "has" : "");
+    nb.onclick = () => {
+      closePop(); editing = i;
+      const next = sessionRow(i); li.replaceWith(next);
+      const inp = next.querySelector("input"); if (inp) inp.focus();
+    };
+    const ib = iconBtn(ICON_INFO, "Session details");
+    ib.onclick = () => openPop(ib, parseKey(st.day), todayList(), i);
+    li.append(nb, ib);
+
+    if (editing === i) {
+      const inp = el("input", "note-in");
+      inp.maxLength = 120; inp.placeholder = "Add a note, press Enter to save"; inp.value = x.note || "";
+      let done = false;
+      const finish = commit => {
+        if (done) return; done = true;
+        if (commit) { const v = inp.value.trim(); if (v) x.note = v; else delete x.note; save(); }
+        editing = null;
+        if (li.isConnected) li.replaceWith(sessionRow(i));
+      };
+      inp.onkeydown = e => { if (e.key === "Enter") finish(true); else if (e.key === "Escape") finish(false); };
+      inp.onblur = () => finish(true);
+      li.appendChild(el("div", "note-line")).appendChild(inp);
+    } else if (x.note) {
+      li.appendChild(el("div", "note-line", x.note));
+    }
+    return li;
+  }
+
+  function runningRow() {
+    const li = el("li", "sess");
+    li.append(el("span", "l", `${fmtTime(st.startedAt)} – now`), el("span", "r", "Running"), el("span", "sp"), el("span", "sp"));
+    return li;
+  }
+
+  /* Earlier days: date, bar, total, info icon */
+  function dayRow(k, pct) {
+    const e = st.history[k];
+    const li = el("li", "day");
+    const bar = el("span", "bar"); bar.innerHTML = "<b></b>"; bar.firstChild.style.width = pct + "%";
+    li.append(el("span", "l", dayFmt.format(parseKey(k))), bar, el("span", "r", fmtDur(e.t)));
+    const ib = iconBtn(ICON_INFO, "Day details");
+    ib.onclick = () => openPop(ib, parseKey(k), e.s && e.s.length ? e.s : null, -1, e.t);
+    li.appendChild(ib);
+    return li;
+  }
+
+  function renderLists() {
+    closePop();
+    const s = $("sessions"), h = $("history");
+    s.replaceChildren(); h.replaceChildren();
+    st.sessions.forEach((_, i) => s.appendChild(sessionRow(i)));
+    if (st.startedAt) s.appendChild(runningRow());
+    if (!s.children.length) s.appendChild(empty("No sessions yet. Press Start to begin."));
+
+    const days = Object.keys(st.history).sort().reverse();
+    const max = Math.max(...days.map(k => st.history[k].t), 1);
+    days.slice(0, showAllDays ? days.length : 3).forEach(k => h.appendChild(dayRow(k, Math.round(st.history[k].t / max * 100))));
+    if (!days.length) h.appendChild(empty("Totals for previous days appear here."));
+
+    const more = $("more");
+    more.hidden = days.length <= 3;
+    more.textContent = showAllDays ? "Show less" : `Read more (${days.length - 3} more)`;
+  }
+
+  $("more").onclick = () => { showAllDays = !showAllDays; renderLists(); };
+  document.addEventListener("click", e => { if (popBtn && !pop.contains(e.target) && !popBtn.contains(e.target)) closePop(); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape") closePop(); });
+  addEventListener("scroll", closePop, { passive: true });
+  addEventListener("resize", closePop);
+
+  /* ---------- Render ---------- */
+  const dateFmt = new Intl.DateTimeFormat("en", { weekday: "long", day: "numeric", month: "long" });
+  let lastSec = -1, lastBtn = "", lastState = "";
+
+  function render() {
+    const now = Date.now();
+    if (dayKey(new Date(now)) !== st.day) { rollover(new Date(now)); renderLists(); }
+    const running = !!st.startedAt;
+    const ms = st.elapsed + (running ? now - st.startedAt : 0);
+    const sec = Math.floor(ms / 1000);
+    const h = Math.min(99, Math.floor(sec / 3600)), m = Math.floor(sec % 3600 / 60), s = sec % 60;
+    const cs = Math.floor(ms % 1000 / 10);
+
+    [h, m, s].forEach((v, i) => { setDigit(D[i * 2], Math.floor(v / 10)); setDigit(D[i * 2 + 1], v % 10); });
+    setDigit(D[6], Math.floor(cs / 10)); setDigit(D[7], cs % 10);
+
+    const lit = !running || Math.floor(ms / 500) % 2 === 0;
+    colons.forEach(c => c.classList.toggle("on", lit));
+
+    const btn = running ? "Pause" : ms > 0 ? "Resume" : "Start";
+    if (btn !== lastBtn) { $("toggle").textContent = btn; lastBtn = btn; }
+    const state = running ? "Running" : ms > 0 ? "Paused" : "Ready";
+    if (state !== lastState) { $("state").textContent = state; $("panel").classList.toggle("running", running); lastState = state; }
+
+    if (sec !== lastSec) {
+      lastSec = sec;
+      $("date").textContent = dateFmt.format(new Date(now));
+      document.title = running ? `${pad(h)}:${pad(m)}:${pad(s)} Stopwatch` : "Stopwatch";
+    }
+  }
+
+  let raf = 0;
+  function loop() { raf = 0; render(); if (st.startedAt) raf = requestAnimationFrame(loop); }
+  const ensureLoop = () => { if (st.startedAt && !raf) raf = requestAnimationFrame(loop); };
+
+  /* ---------- Actions ---------- */
+  function toggle() {
+    const now = Date.now();
+    rollover(new Date(now));
+    if (st.startedAt) {
+      st.elapsed += now - st.startedAt;
+      st.sessions.push({ s: st.startedAt, e: now });
+      st.startedAt = null;
+    } else {
+      st.startedAt = now;
+    }
+    save(); renderLists(); render(); ensureLoop();
+  }
+
+  let armed = 0;
+  $("reset").onclick = () => {
+    const btn = $("reset");
+    if (!armed) {
+      armed = setTimeout(() => { armed = 0; btn.textContent = "Reset today"; }, 3000);
+      btn.textContent = "Tap again to reset";
+      return;
+    }
+    clearTimeout(armed); armed = 0; btn.textContent = "Reset today";
+    archiveCurrentDay(Date.now());
+    st.elapsed = 0; st.startedAt = null; st.sessions = [];
+    save(); renderLists(); render();
+  };
+
+  $("toggle").onclick = toggle;
+  document.addEventListener("keydown", e => {
+    if (e.code === "Space" && !/BUTTON|INPUT/.test(e.target.tagName)) { e.preventDefault(); toggle(); }
+  });
+  document.addEventListener("visibilitychange", () => { render(); ensureLoop(); });
+  setInterval(render, 1000);
+
+  renderLists(); render(); ensureLoop();
+})();
+</script>
+</body>
+</html>

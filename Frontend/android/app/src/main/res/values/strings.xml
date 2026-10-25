@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">TimeFlow</string>
+    <string name="title_activity_main">TimeFlow</string>
+    <string name="package_name">com.timeflow.app</string>
+    <string name="custom_url_scheme">com.timeflow.app</string>
+</resources>

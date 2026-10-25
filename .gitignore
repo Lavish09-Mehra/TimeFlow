@@ -1,0 +1,143 @@
+# ============================================================
+# TimeFlow .gitignore
+# ============================================================
+
+# ---------- Operating system files ----------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ---------- Editors and IDEs ----------
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json.example
+.idea/
+*.iml
+*.ipr
+*.iws
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*~
+*.bak
+*.tmp
+
+# ---------- Logs ----------
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ---------- Node.js ----------
+node_modules/
+Frontend/node_modules/
+.pnpm-store/
+.npm/
+.yarn/
+Frontend/.vite/
+.vite/
+*.tsbuildinfo
+*.local
+coverage/
+.nyc_output/
+
+# ---------- Environment files ----------
+.env
+.env.*
+!.env.example
+!.env.sample
+
+# ---------- Web build output ----------
+Frontend/dist/
+Frontend/dist-ssr/
+Frontend/build/
+
+# ---------- Local toolchain ----------
+# JDK, Android command-line tools, and SDK downloaded for local builds.
+# These are large and machine-specific; reinstall them on a new machine.
+.tools/
+
+# ---------- Android / Gradle ----------
+# The nested Frontend/android/.gitignore also covers these paths.
+.gradle/
+**/build/
+!**/build/.npmkeep
+Frontend/android/.gradle/
+Frontend/android/build/
+Frontend/android/app/build/
+Frontend/android/captures/
+Frontend/android/.externalNativeBuild/
+Frontend/android/.cxx/
+Frontend/android/local.properties
+Frontend/android/.navigation/
+Frontend/android/freeline/
+Frontend/android/freeline.py
+Frontend/android/fastlane/report.xml
+Frontend/android/fastlane/Preview.html
+Frontend/android/fastlane/screenshots
+Frontend/android/fastlane/test_output
+
+# Generated Capacitor web assets and config
+Frontend/android/app/src/main/assets/public/
+Frontend/android/app/src/main/assets/capacitor.config.json
+Frontend/android/app/src/main/assets/capacitor.plugins.json
+Frontend/android/app/src/main/res/xml/config.xml
+Frontend/android/capacitor-cordova-android-plugins/
+
+# Android compiled artifacts
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+*.hprof
+bin/
+gen/
+out/
+proguard/
+
+# ---------- Keystores and secrets ----------
+# Never commit production signing keys or credentials.
+*.jks
+*.keystore
+*.p12
+*.pfx
+keystore.properties
+signing.properties
+google-services.json
+
+# ---------- Test and coverage output ----------
+Frontend/coverage/
+Frontend/test-results/
+Frontend/playwright-report/
+Frontend/.nyc_output/
+
+# ---------- Misc cache ----------
+.cache/
+.parcel-cache/
+.eslintcache
+.stylelintcache
+
+# ============================================================
+# Intentional exceptions
+# ============================================================
+
+# Keep the downloadable root APK so the README download link works.
+# Android build outputs inside Frontend/android/ remain ignored above.
+!TimeFlow-debug.apk
+
+# Keep the APK checksum.
+!TimeFlow-debug.apk.sha256
+
+# Keep source icon and splash assets used by @capacitor/assets.
+!Frontend/assets/*.png
