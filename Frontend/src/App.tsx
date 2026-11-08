@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { Browser } from '@capacitor/browser';
 import AndroidNotepad from './AndroidNotepad';
 import timeFlowLogo from './TimeFlow Geometric Logo.png';
@@ -14,6 +14,8 @@ async function openExternalLink(event: { preventDefault: () => void }, url: stri
 
 const TARGET_KEY = 'timerdate-target';
 const BG_KEY = 'timerdate-bg';
+const DISPLAY_KEY = 'timerdate-display-mode';
+const HOUR_KEY = 'timerdate-hour-format';
 const APP_NAME = import.meta.env.VITE_APP_NAME || 'TimeFlow';
 const DEFAULT_BG = import.meta.env.VITE_DEFAULT_BG || '#36454F';
 const GITHUB_URL = import.meta.env.VITE_GITHUB_URL || 'https://github.com/Lavish09-Mehra/TimeFlow';
@@ -44,7 +46,22 @@ function toDateTimeInput(date: Date) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
-const fmt = new Intl.DateTimeFormat('en', { dateStyle: 'full', timeStyle: 'short' });
+const fmt12 = new Intl.DateTimeFormat('en', { dateStyle: 'full', timeStyle: 'short', hour12: true });
+const fmt24 = new Intl.DateTimeFormat('en', { dateStyle: 'full', timeStyle: 'short', hour12: false });
+
+const MENU_ITEM_STYLE: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: '12px',
+  width: '100%',
+  textAlign: 'left',
+  background: 'none',
+  border: 'none',
+  color: '#eceef5',
+  padding: '8px 12px',
+  cursor: 'pointer'
+};
 
 const SEGS: Record<string, string> = {
   a: "12,2 48,2 54,8 48,14 12,14 6,8",
@@ -122,6 +139,21 @@ export default function App() {
   const [started, setStarted] = useState(() => localStorage.getItem('timerdate-setup') === 'done');
   const [noteToSelfOpen, setNoteToSelfOpen] = useState(false);
   const [noteChoice, setNoteChoice] = useState<'stay' | 'giveup' | null>(null);
+  const [displayMode, setDisplayMode] = useState<'full' | 'days'>(() => {
+    try {
+      return localStorage.getItem(DISPLAY_KEY) === 'days' ? 'days' : 'full';
+    } catch {
+      return 'full';
+    }
+  });
+  const [hourFormat, setHourFormat] = useState<'12' | '24'>(() => {
+    try {
+      return localStorage.getItem(HOUR_KEY) === '24' ? '24' : '12';
+    } catch {
+      return '12';
+    }
+  });
+  const [daysLeft, setDaysLeft] = useState(0);
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -150,10 +182,28 @@ export default function App() {
   }, [target, started]);
 
   useEffect(() => {
+    try {
+      localStorage.setItem(DISPLAY_KEY, displayMode);
+    } catch {
+      // Ignore storage errors; the format still applies for this session.
+    }
+  }, [displayMode]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(HOUR_KEY, hourFormat);
+    } catch {
+      // Ignore storage errors; the format still applies for this session.
+    }
+  }, [hourFormat]);
+
+  useEffect(() => {
+    const fmt = hourFormat === '24' ? fmt24 : fmt12;
     const tick = () => {
       if (!started) {
         setFinished(false);
         setVals([0,0,0,0,0,0]);
+        setDaysLeft(0);
         setStatus('Set your target and start the timer.');
         return;
       }
@@ -162,13 +212,21 @@ export default function App() {
       setFinished(isFinished);
       const v = isFinished ? [0,0,0,0,0,0] : diff(now, target);
       setVals(v as number[]);
-      setStatus(isFinished ? `Time’s up. The target was ${fmt.format(target)}.` : `Counting down to ${fmt.format(target)}`);
+      const dleft = isFinished ? 0 : Math.max(0, Math.floor((target.getTime() - now.getTime()) / 86400000));
+      setDaysLeft(dleft);
+      setStatus(
+        isFinished
+          ? `Time’s up. The target was ${fmt.format(target)}.`
+          : displayMode === 'days'
+            ? `${dleft} day${dleft === 1 ? '' : 's'} left — counting down to ${fmt.format(target)}`
+            : `Counting down to ${fmt.format(target)}`
+      );
       setBlink(s => !s);
     };
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, [target, started]);
+  }, [target, started, hourFormat, displayMode]);
 
   const start = () => {
     const d = new Date(inputVal);
@@ -215,6 +273,8 @@ export default function App() {
       localStorage.removeItem('timerdate-why');
       localStorage.removeItem(TARGET_KEY);
       localStorage.removeItem(BG_KEY);
+      localStorage.removeItem(DISPLAY_KEY);
+      localStorage.removeItem(HOUR_KEY);
       localStorage.removeItem('android_notepad_todo_items');
       localStorage.removeItem('android_notepad_theme');
       localStorage.removeItem('timeflow_notepad_items_v1');
@@ -225,6 +285,8 @@ export default function App() {
       setTarget(d);
       setInputVal(toDateTimeInput(d));
       setBgColor(DEFAULT_BG);
+      setDisplayMode('full');
+      setHourFormat('12');
       setStarted(false);
       setStatus('Data cleared.');
       setSettingsOpen(false);
@@ -246,6 +308,15 @@ export default function App() {
     setNoteToSelfOpen(true);
   };
 
+  const displayGroups = displayMode === 'days'
+    ? [
+        { label: 'Days', value: daysLeft, max: 9999 },
+        { label: 'Hours', value: vals[3] ?? 0, max: 99 },
+        { label: 'Minutes', value: vals[4] ?? 0, max: 99 },
+        { label: 'Seconds', value: vals[5] ?? 0, max: 99 }
+      ]
+    : UNITS.map((name, i) => ({ label: name, value: vals[i] ?? 0, max: 99 }));
+
   return (
     <div style={{background:bgColor, minHeight:'100vh'}}>
       <button
@@ -259,6 +330,16 @@ export default function App() {
         <div style={{position:'fixed', top:'60px', right:'16px', zIndex:1000, background:'#17181c', border:'1px solid #353740', borderRadius:'12px', padding:'8px', minWidth:'200px', boxShadow:'0 8px 24px rgba(0,0,0,0.5)'}}>
           <button onClick={openChangeTarget} style={{display:'block', width:'100%', textAlign:'left', background:'none', border:'none', color:'#eceef5', padding:'8px 12px', cursor:'pointer'}}>Change target date/time</button>
           <button onClick={()=>{setSettingsOpen(false); setBgPickerOpen(true);}} style={{display:'block', width:'100%', textAlign:'left', background:'none', border:'none', color:'#eceef5', padding:'8px 12px', cursor:'pointer'}}>Change background color</button>
+          <div style={{height:'1px', background:'#353740', margin:'6px 8px'}} />
+          <button onClick={()=>setDisplayMode(m => m === 'days' ? 'full' : 'days')} style={MENU_ITEM_STYLE}>
+            <span>Show days left</span>
+            <span style={{color:'#7aa2f7', opacity: displayMode === 'days' ? 1 : 0}}>✓</span>
+          </button>
+          <button onClick={()=>setHourFormat(h => h === '24' ? '12' : '24')} style={MENU_ITEM_STYLE}>
+            <span>24-hour time</span>
+            <span style={{color:'#7aa2f7', opacity: hourFormat === '24' ? 1 : 0}}>✓</span>
+          </button>
+          <div style={{height:'1px', background:'#353740', margin:'6px 8px'}} />
           <button onClick={deleteData} style={{display:'block', width:'100%', textAlign:'left', background:'none', border:'none', color:'#eceef5', padding:'8px 12px', cursor:'pointer'}}>Delete data</button>
           <button onClick={()=>{setSettingsOpen(false); setAboutOpen(true);}} style={{display:'block', width:'100%', textAlign:'left', background:'none', border:'none', color:'#eceef5', padding:'8px 12px', cursor:'pointer'}}>About this project</button>
         </div>
@@ -268,6 +349,13 @@ export default function App() {
           <div style={{background:'#1a1b20', padding:'20px', borderRadius:'12px', border:'1px solid #353740'}}>
             <h3 style={{margin:'0 0 12px', color:'#eceef5'}}>Change target date/time</h3>
             <input type="datetime-local" value={inputVal} onChange={e=>setInputVal(e.target.value)} style={{padding:'8px', borderRadius:'8px', border:'1px solid #353740', background:'#0f1115', color:'#eceef5'}} />
+            <p style={{margin:'8px 0 0', color:'#8e93a3', fontSize:'12.5px', maxWidth:'320px', lineHeight:1.5}}>
+              {(() => {
+                const d = new Date(inputVal);
+                if (Number.isNaN(d.getTime())) return 'Pick a valid date and time.';
+                return `Shown as: ${(hourFormat === '24' ? fmt24 : fmt12).format(d)}`;
+              })()}
+            </p>
             <div style={{marginTop:'12px', display:'flex', gap:'8px'}}>
               <button onClick={()=>{start(); setChangeTargetOpen(false);}} style={{padding:'8px 12px', borderRadius:'8px', border:'none', background:'#7aa2f7', color:'#0b0d12', cursor:'pointer'}}>Save</button>
               <button onClick={()=>setChangeTargetOpen(false)} style={{padding:'8px 12px', borderRadius:'8px', border:'1px solid #353740', background:'#1a1b20', color:'#eceef5', cursor:'pointer'}}>Cancel</button>
@@ -461,25 +549,25 @@ export default function App() {
         <div className="bezel-inner">
           <div className={`panel ${finished ? 'done' : ''}`} ref={panelRef} id="panel">
             <div className="groups" id="groups">
-              {UNITS.map((name, i) => {
-                const v = Math.min(99, Math.max(0, vals[i] ?? 0));
-                const d1 = Math.floor(v / 10);
-                const d2 = v % 10;
+              {displayGroups.map((g, i) => {
+                const v = Math.min(g.max, Math.max(0, g.value));
+                const digits = String(v).padStart(2, '0');
                 return (
-                  <>
-                    <div className="group" key={name}>
+                  <Fragment key={g.label}>
+                    <div className="group">
                       <div className="pair">
-                        <Digit value={d1} />
-                        <Digit value={d2} />
+                        {digits.split('').map((d, di) => (
+                          <Digit key={di} value={Number(d)} />
+                        ))}
                       </div>
-                      <div className="label">{name}</div>
+                      <div className="label">{g.label}</div>
                     </div>
-                    {i < UNITS.length - 1 && (
-                      <div key={`c${i}`} className={`colon ${blink ? 'on' : ''}`}>
+                    {i < displayGroups.length - 1 && (
+                      <div className={`colon ${blink ? 'on' : ''}`}>
                         <i></i><i></i>
                       </div>
                     )}
-                  </>
+                  </Fragment>
                 );
               })}
             </div>
